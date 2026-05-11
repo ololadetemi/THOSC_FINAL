@@ -9,7 +9,9 @@ export const DoctorDashboard = () => {
   const [appointments, setAppointments] = useState([]);
 
   useEffect(() => {
-    api.get('/api/doctor/appointments?status=scheduled').then(res => setAppointments(res.data.appointments || [])).catch(() => {});
+    api.get('/api/doctor/appointments?status=scheduled')
+      .then(res => setAppointments(res.data.appointments || []))
+      .catch(() => {});
   }, []);
 
   return (
@@ -44,7 +46,9 @@ export const DoctorDashboard = () => {
                   <p className="font-medium text-sm text-primary-600">{a.patient?.patientName}</p>
                   <p className="text-gray-500 text-xs">Card: {a.patient?.cardNumber} • {a.reason}</p>
                 </div>
-                <p className="text-accent-500 text-sm font-medium">{new Date(a.appointmentDate).toLocaleDateString()}</p>
+                <p className="text-accent-500 text-sm font-medium">
+                  {new Date(a.appointmentDate).toLocaleDateString()}
+                </p>
               </div>
             ))}
           </div>
@@ -58,7 +62,9 @@ export const PatientList = () => {
   const [patients, setPatients] = useState([]);
   const [search, setSearch] = useState('');
 
-  useEffect(() => { api.get('/api/doctor/all-patients').then(res => setPatients(res.data)).catch(() => {}); }, []);
+  useEffect(() => {
+    api.get('/api/doctor/all-patients').then(res => setPatients(res.data)).catch(() => {});
+  }, []);
 
   const filtered = patients.filter(p =>
     p.patientName.toLowerCase().includes(search.toLowerCase()) ||
@@ -69,14 +75,17 @@ export const PatientList = () => {
     <Layout>
       <h1 className="text-2xl font-heading font-bold text-primary-600 mb-6">All Patients</h1>
       <div className="mb-4">
-        <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search by name or card number..."
+        <input value={search} onChange={e => setSearch(e.target.value)}
+          placeholder="Search by name or card number..."
           className="w-full max-w-md px-4 py-2.5 rounded-lg border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-accent-500 bg-white" />
       </div>
       <div className="bg-white rounded-xl shadow-sm overflow-hidden">
         <table className="w-full text-sm">
           <thead className="bg-surface text-gray-500 uppercase text-xs">
-            <tr>{['Name', 'Card No.', 'Gender', 'Contact', 'Assigned Doctor', 'Action'].map(h =>
-              <th key={h} className="px-6 py-3 text-left font-medium">{h}</th>)}
+            <tr>
+              {['Name', 'Card No.', 'Gender', 'Contact', 'Assigned Doctor', 'Action'].map(h =>
+                <th key={h} className="px-6 py-3 text-left font-medium">{h}</th>
+              )}
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-100">
@@ -88,7 +97,9 @@ export const PatientList = () => {
                 <td className="px-6 py-4">{p.contact}</td>
                 <td className="px-6 py-4">{p.assignedDoctor?.name || <span className="text-gray-400">Unassigned</span>}</td>
                 <td className="px-6 py-4">
-                  <Link to={`/doctor/patients/${p._id}`} className="text-accent-500 hover:underline text-xs font-medium">View →</Link>
+                  <Link to={`/doctor/patients/${p._id}`} className="text-accent-500 hover:underline text-xs font-medium">
+                    View →
+                  </Link>
                 </td>
               </tr>
             ))}
@@ -102,68 +113,107 @@ export const PatientList = () => {
 export const PatientProfile = () => {
   const { patientId } = useParams();
   const [patient, setPatient] = useState(null);
+
+  // Note state
   const [note, setNote] = useState('');
-  const [aiLoading, setAiLoading] = useState(false);
-  const [message, setMessage] = useState('');
+  const [noteMessage, setNoteMessage] = useState('');
 
-  useEffect(() => {
+  // Lab request state
+  const [labForm, setLabForm] = useState({ testName: '', instructions: '' });
+  const [labMessage, setLabMessage] = useState('');
+
+  // Prescription state
+  const [drugs, setDrugs] = useState([{ drugName: '', dosage: '', duration: '', notes: '' }]);
+  const [prescMessage, setPrescMessage] = useState('');
+
+  // Follow-up state
+  const [followUpDate, setFollowUpDate] = useState('');
+  const [followUpReason, setFollowUpReason] = useState('');
+  const [followUpMessage, setFollowUpMessage] = useState('');
+
+  const inputClass = "w-full px-3 py-2.5 rounded-lg border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-accent-500 bg-white";
+  const labelClass = "block text-sm font-medium text-primary-600 mb-1";
+
+  const refreshPatient = () => {
     api.get(`/api/doctor/patient/${patientId}`).then(res => setPatient(res.data)).catch(() => {});
-  }, [patientId]);
+  };
 
+  useEffect(() => { refreshPatient(); }, [patientId]);
+
+  // Add consultation note
   const handleAddNote = async (e) => {
     e.preventDefault();
     try {
       await api.post(`/api/doctor/add-note/${patientId}`, { note });
-      setMessage('Note added successfully');
+      setNoteMessage('✅ Note added successfully');
       setNote('');
-      api.get(`/api/doctor/patient/${patientId}`).then(res => setPatient(res.data));
-    } catch { setMessage('Error adding note'); }
+      refreshPatient();
+    } catch { setNoteMessage('❌ Error adding note'); }
   };
 
-  // const generateAISummary = async (noteId, noteText) => {
-  //   setAiLoading(true);
-  //   try {
-  //     const res = await fetch('https://api.anthropic.com/v1/messages', {
-  //       method: 'POST',
-  //       headers: { 'Content-Type': 'application/json' },
-  //       body: JSON.stringify({
-  //         model: 'claude-sonnet-4-20250514',
-  //         max_tokens: 1000,
-  //         messages: [{ role: 'user', content: `You are a medical assistant. Based on the following consultation notes from an orthopedic and spine specialist hospital, generate a clean, concise clinical summary in 3-5 sentences suitable for a patient medical record. Notes: ${noteText}` }]
-  //       })
-  //     });
-//   const res = await fetch('https://api.anthropic.com/v1/messages', {
-//   method: 'POST',
-//   headers: {
-//     'Content-Type': 'application/json',
-//     'x-api-key': 'YOUR_ANTHROPIC_API_KEY_HERE',
-//     'anthropic-version': '2023-06-01',
-//     'anthropic-dangerous-direct-browser-access': 'true'
-//   },
-//   body: JSON.stringify({
-//     model: 'claude-sonnet-4-20250514',
-//     max_tokens: 1000,
-//     messages: [{
-//       role: 'user',
-//       content: `You are a medical assistant for an orthopedic and spine specialist hospital. Based on the following consultation notes, generate a clean, concise clinical summary in 3-5 sentences suitable for a patient medical record. Notes: ${noteText}`
-//     }]
-//   })
-// });
-//       const data = await res.json();
-//       const summary = data.content?.[0]?.text || '';
-//       await api.put(`/api/doctor/ai-summary/${patientId}/${noteId}`, { aiSummary: summary });
-//       api.get(`/api/doctor/patient/${patientId}`).then(res => setPatient(res.data));
-//     } catch { alert('Error generating summary'); }
-//     setAiLoading(false);
-//   };
-  
+  // Request lab test
+  const handleLabRequest = async (e) => {
+    e.preventDefault();
+    try {
+      await api.post('/api/doctor/request-lab', { patientId, ...labForm });
+      setLabMessage('✅ Lab test requested successfully');
+      setLabForm({ testName: '', instructions: '' });
+    } catch { setLabMessage('❌ Error requesting lab test'); }
+  };
 
-  if (!patient) return <Layout><p className="text-gray-400">Loading patient...</p></Layout>;
+  // Add drug row
+  const addDrug = () => setDrugs([...drugs, { drugName: '', dosage: '', duration: '', notes: '' }]);
+
+  // Remove drug row
+  const removeDrug = (index) => setDrugs(drugs.filter((_, i) => i !== index));
+
+  // Update drug field
+  const updateDrug = (index, field, value) => {
+    const updated = [...drugs];
+    updated[index][field] = value;
+    setDrugs(updated);
+  };
+
+  // Write prescription
+  const handlePrescription = async (e) => {
+    e.preventDefault();
+    try {
+      await api.post('/api/doctor/prescription', { patientId, drugs });
+      setPrescMessage('✅ Prescription written successfully');
+      setDrugs([{ drugName: '', dosage: '', duration: '', notes: '' }]);
+    } catch { setPrescMessage('❌ Error writing prescription'); }
+  };
+
+  // Schedule follow-up
+  const handleFollowUp = async (e) => {
+    e.preventDefault();
+    try {
+      await api.post('/api/doctor/follow-up', {
+        patientId,
+        appointmentDate: followUpDate,
+        reason: followUpReason || 'Follow-up'
+      });
+      setFollowUpMessage('✅ Follow-up appointment scheduled successfully');
+      setFollowUpDate('');
+      setFollowUpReason('');
+    } catch { setFollowUpMessage('❌ Error scheduling follow-up'); }
+  };
+
+  if (!patient) return (
+    <Layout>
+      <div className="flex items-center justify-center h-64">
+        <p className="text-gray-400">Loading patient...</p>
+      </div>
+    </Layout>
+  );
 
   return (
     <Layout>
-      <Link to="/doctor/patients" className="text-accent-500 text-sm hover:underline mb-4 inline-block">← Back to patients</Link>
+      <Link to="/doctor/patients" className="text-accent-500 text-sm hover:underline mb-4 inline-block">
+        ← Back to patients
+      </Link>
 
+      {/* Patient Info */}
       <div className="bg-white rounded-xl shadow-sm p-6 mb-6">
         <h1 className="text-2xl font-heading font-bold text-primary-600 mb-4">{patient.patientName}</h1>
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
@@ -185,39 +235,156 @@ export const PatientProfile = () => {
         </div>
       </div>
 
+      {/* Consultation Note */}
       <div className="bg-white rounded-xl shadow-sm p-6 mb-6">
-        <h2 className="font-heading font-semibold text-primary-600 mb-4">Add Consultation Note</h2>
-        {message && <div className="bg-green-50 border border-green-200 text-green-700 rounded-lg p-3 mb-4 text-sm">{message}</div>}
+        <h2 className="font-heading font-semibold text-primary-600 mb-1">Add Consultation Note</h2>
+        <p className="text-gray-400 text-xs mb-4">Document your findings, diagnosis and treatment plan</p>
+        {noteMessage && (
+          <div className={`rounded-lg p-3 mb-4 text-sm ${noteMessage.includes('❌') ? 'bg-red-50 border border-red-200 text-red-700' : 'bg-green-50 border border-green-200 text-green-700'}`}>
+            {noteMessage}
+          </div>
+        )}
         <form onSubmit={handleAddNote}>
-          <textarea value={note} onChange={e => setNote(e.target.value)} required rows={5}
-            placeholder="Enter consultation notes, diagnosis, treatment plan..."
-            className="w-full px-4 py-3 rounded-lg border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-accent-500 resize-none" />
-          <button type="submit" className="mt-3 bg-primary-600 hover:bg-primary-700 text-white px-6 py-2.5 rounded-lg text-sm font-medium transition-all">
+          <textarea value={note} onChange={e => setNote(e.target.value)} required rows={6}
+            placeholder="Enter consultation notes, examination findings, diagnosis, treatment plan..."
+            className={`${inputClass} resize-none`} />
+          <button type="submit"
+            className="mt-3 bg-primary-600 hover:bg-primary-700 text-white px-6 py-2.5 rounded-lg text-sm font-medium transition-all">
             Save Note
           </button>
         </form>
       </div>
 
+      {/* Request Lab Test */}
+      <div className="bg-white rounded-xl shadow-sm p-6 mb-6">
+        <h2 className="font-heading font-semibold text-primary-600 mb-1">Request Lab Test</h2>
+        <p className="text-gray-400 text-xs mb-4">Lab technician will be notified of this request</p>
+        {labMessage && (
+          <div className={`rounded-lg p-3 mb-4 text-sm ${labMessage.includes('❌') ? 'bg-red-50 border border-red-200 text-red-700' : 'bg-green-50 border border-green-200 text-green-700'}`}>
+            {labMessage}
+          </div>
+        )}
+        <form onSubmit={handleLabRequest} className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div>
+            <label className={labelClass}>Test Name</label>
+            <input value={labForm.testName} onChange={e => setLabForm({ ...labForm, testName: e.target.value })}
+              required placeholder="e.g. MRI Lumbar Spine, Full Blood Count, ESR"
+              className={inputClass} />
+          </div>
+          <div>
+            <label className={labelClass}>Instructions (Optional)</label>
+            <input value={labForm.instructions} onChange={e => setLabForm({ ...labForm, instructions: e.target.value })}
+              placeholder="Any special instructions for the lab technician"
+              className={inputClass} />
+          </div>
+          <div className="md:col-span-2">
+            <button type="submit"
+              className="bg-accent-500 hover:bg-accent-600 text-white px-6 py-2.5 rounded-lg text-sm font-medium transition-all">
+              Send Lab Request
+            </button>
+          </div>
+        </form>
+      </div>
+
+      {/* Write Prescription */}
+      <div className="bg-white rounded-xl shadow-sm p-6 mb-6">
+        <h2 className="font-heading font-semibold text-primary-600 mb-1">Write Prescription</h2>
+        <p className="text-gray-400 text-xs mb-4">Pharmacist will see this and dispense accordingly</p>
+        {prescMessage && (
+          <div className={`rounded-lg p-3 mb-4 text-sm ${prescMessage.includes('❌') ? 'bg-red-50 border border-red-200 text-red-700' : 'bg-green-50 border border-green-200 text-green-700'}`}>
+            {prescMessage}
+          </div>
+        )}
+        <form onSubmit={handlePrescription} className="space-y-3">
+          {drugs.map((drug, index) => (
+            <div key={index} className="bg-surface rounded-xl p-4 relative">
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                <div>
+                  <label className={labelClass}>Drug Name</label>
+                  <input value={drug.drugName} onChange={e => updateDrug(index, 'drugName', e.target.value)}
+                    required placeholder="e.g. Ibuprofen 400mg" className={inputClass} />
+                </div>
+                <div>
+                  <label className={labelClass}>Dosage</label>
+                  <input value={drug.dosage} onChange={e => updateDrug(index, 'dosage', e.target.value)}
+                    required placeholder="e.g. 1 tablet 3x daily" className={inputClass} />
+                </div>
+                <div>
+                  <label className={labelClass}>Duration</label>
+                  <input value={drug.duration} onChange={e => updateDrug(index, 'duration', e.target.value)}
+                    required placeholder="e.g. 7 days" className={inputClass} />
+                </div>
+                <div>
+                  <label className={labelClass}>Notes</label>
+                  <input value={drug.notes} onChange={e => updateDrug(index, 'notes', e.target.value)}
+                    placeholder="e.g. Take with food" className={inputClass} />
+                </div>
+              </div>
+              {drugs.length > 1 && (
+                <button type="button" onClick={() => removeDrug(index)}
+                  className="absolute top-3 right-3 text-red-400 hover:text-red-600 text-xs font-medium">
+                  Remove
+                </button>
+              )}
+            </div>
+          ))}
+          <div className="flex gap-3 flex-wrap">
+            <button type="button" onClick={addDrug}
+              className="border border-accent-500 text-accent-500 hover:bg-accent-50 px-4 py-2.5 rounded-lg text-sm font-medium transition-all">
+              + Add Another Drug
+            </button>
+            <button type="submit"
+              className="bg-primary-600 hover:bg-primary-700 text-white px-6 py-2.5 rounded-lg text-sm font-medium transition-all">
+              Submit Prescription
+            </button>
+          </div>
+        </form>
+      </div>
+
+      {/* Schedule Follow-up */}
+      <div className="bg-white rounded-xl shadow-sm p-6 mb-6">
+        <h2 className="font-heading font-semibold text-primary-600 mb-1">Schedule Follow-up</h2>
+        <p className="text-gray-400 text-xs mb-4">Book a follow-up appointment for this patient</p>
+        {followUpMessage && (
+          <div className={`rounded-lg p-3 mb-4 text-sm ${followUpMessage.includes('❌') ? 'bg-red-50 border border-red-200 text-red-700' : 'bg-green-50 border border-green-200 text-green-700'}`}>
+            {followUpMessage}
+          </div>
+        )}
+        <form onSubmit={handleFollowUp} className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div>
+            <label className={labelClass}>Follow-up Date & Time</label>
+            <input type="datetime-local" value={followUpDate}
+              onChange={e => setFollowUpDate(e.target.value)} required className={inputClass} />
+          </div>
+          <div>
+            <label className={labelClass}>Reason</label>
+            <input value={followUpReason} onChange={e => setFollowUpReason(e.target.value)}
+              placeholder="e.g. Review MRI results, Wound check" className={inputClass} />
+          </div>
+          <div className="md:col-span-2">
+            <button type="submit"
+              className="bg-primary-600 hover:bg-primary-700 text-white px-6 py-2.5 rounded-lg text-sm font-medium transition-all">
+              Schedule Follow-up
+            </button>
+          </div>
+        </form>
+      </div>
+
+      {/* Previous Notes */}
       <div className="bg-white rounded-xl shadow-sm p-6">
-        <h2 className="font-heading font-semibold text-primary-600 mb-4">Previous Notes ({patient.doctorsNotes?.length || 0})</h2>
-        {patient.doctorsNotes?.length === 0 ? <p className="text-gray-400 text-sm">No notes yet</p> : (
+        <h2 className="font-heading font-semibold text-primary-600 mb-4">
+          Previous Notes ({patient.doctorsNotes?.length || 0})
+        </h2>
+        {!patient.doctorsNotes || patient.doctorsNotes.length === 0 ? (
+          <p className="text-gray-400 text-sm">No notes yet for this patient</p>
+        ) : (
           <div className="space-y-4">
             {[...patient.doctorsNotes].reverse().map(n => (
               <div key={n._id} className="border border-gray-100 rounded-xl p-4 hover:border-accent-200 transition-all">
-                <div className="flex justify-between items-start mb-2">
-                  <p className="text-xs text-gray-400">Dr. {n.doctorId?.name} • {new Date(n.date).toLocaleDateString()}</p>
-                  <button onClick={() => generateAISummary(n._id, n.note)} disabled={aiLoading}
-                    className="text-xs bg-accent-500 hover:bg-accent-600 text-white px-3 py-1 rounded-full font-medium disabled:opacity-60 transition-all">
-                    {aiLoading ? 'Generating...' : '✨ AI Summary'}
-                  </button>
-                </div>
+                <p className="text-xs text-gray-400 mb-2">
+                  Dr. {n.doctorId?.name} • {new Date(n.date).toLocaleDateString()}
+                </p>
                 <p className="text-sm text-gray-700 whitespace-pre-wrap">{n.note}</p>
-                {n.aiSummary && (
-                  <div className="mt-3 bg-surface border border-accent-200 rounded-lg p-3">
-                    <p className="text-xs font-medium text-accent-600 mb-1">AI Clinical Summary</p>
-                    <p className="text-sm text-gray-700">{n.aiSummary}</p>
-                  </div>
-                )}
               </div>
             ))}
           </div>
