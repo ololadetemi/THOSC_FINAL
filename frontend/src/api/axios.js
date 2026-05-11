@@ -1,6 +1,6 @@
 import axios from 'axios';
 
-const api = axios.create({ baseURL: '' });
+const api = axios.create({ baseURL: 'https://thosc-hms-backend.onrender.com' });
 
 api.interceptors.request.use((config) => {
   const token = localStorage.getItem('thosc_token');
